@@ -11,13 +11,13 @@
       title: dest === "work" ? "Time to drive to work" : "Time to drive home",
       body:
         "It's a 30 minute drive. Driving while low is like driving drunk: slow reactions, blurry vision, bad decisions. " +
-        "Your CGM is ~10 minutes behind your actual blood sugar.",
+        "Your G7 is ~10 minutes behind your actual blood sugar.",
       choices: [
         {
           label: "Fingerstick first",
           run() {
             const v = api.fingerstick();
-            api.log(`Fingerstick before driving: ${v} mg/dL.`, v < 80 ? "warn" : "info");
+            api.log(`Fingerstick before driving: ${v} mg/dL. (Meters can be off by up to 15%.)`, v < 80 ? "warn" : "info");
             api.force("driving", 30, "Driving", () => arrive(api, dest));
           },
         },
@@ -40,10 +40,7 @@
     {
       at: at(6, 45),
       run(api) {
-        api.log(
-          "Your alarm goes off. Breakfast, insulin, your long-acting dose: nobody is going to remind you.",
-          "info"
-        );
+        api.log("Your alarm goes off. Check your pod, check your sensor, figure out breakfast.", "info");
       },
     },
     { at: at(7, 50), run: (api) => commute(api, "work") },
@@ -65,12 +62,7 @@
           choices: [
             { label: "Go: BBQ plate with sides", run: () => api.eat("bbq") },
             { label: "Eat the sandwich you packed", run: () => api.eat("sandwich") },
-            {
-              label: "Skip lunch",
-              run() {
-                api.log("You skip lunch. You'll still need to watch for lows from earlier insulin.", "info");
-              },
-            },
+            { label: "Skip lunch", run: () => api.log("You skip lunch.", "info") },
           ],
         });
       },
@@ -109,11 +101,26 @@
         api.modal({
           title: "Evening",
           body:
-            "Exercise is good for you. It can also drop your blood sugar for hours afterward, including in your sleep.",
+            "Cardio usually drops you, lifting usually spikes you, and both can drop you hours later in your sleep. " +
+            "Omnipod 5's Activity feature raises your target to 150 and cuts back insulin. It works best turned on before you start.",
           choices: [
-            { label: "Gym (60 min)", run: () => (api.log("You head to the gym.", "info"), api.force("gym", 60, "At the gym")) },
+            { label: "Go for a run (45 min)", run: () => (api.log("You head out for a run.", "info"), api.force("cardio", 45, "Running")) },
+            { label: "Lift weights (60 min)", run: () => (api.log("You head to the gym to lift.", "info"), api.force("lift", 60, "Lifting weights")) },
             { label: "Walk the dog (30 min)", run: () => (api.log("You take the dog out.", "info"), api.force("walk", 30, "Walking the dog")) },
             { label: "Couch", run: () => api.log("You crash on the couch.", "info") },
+          ],
+        });
+      },
+    },
+    {
+      at: at(20, 45),
+      run(api) {
+        api.modal({
+          title: "A friend texts",
+          body: '"Want to grab a beer?" Alcohol shuts down your liver\'s sugar release for hours. The low it causes usually comes overnight.',
+          choices: [
+            { label: "Have a beer", run: () => api.eat("beer") },
+            { label: "Pass", run: () => api.log("You pass on the beer.", "info") },
           ],
         });
       },
@@ -132,42 +139,86 @@
     '"You don\'t look diabetic."',
     '"Did you get it from eating too much sugar as a kid?"',
     '"Can\'t you just take a pill for that?"',
-    '"At least it\'s the kind you can control, right?"',
+    '"Is that a nicotine patch on your arm?"',
+    '"Your pump does all the work now though, right?"',
   ];
+
+  const INSURANCE = [
+    "The pharmacy says your pods need a new prior authorization before they can refill them.",
+    'Insurance denied your G7 sensor refill: "too soon to refill." A sensor fell off last week.',
+    "Your pod order is on backorder. The pharmacy doesn't know when it'll ship.",
+    "Insurance changed its formulary. Your insulin now needs a prior authorization.",
+  ];
+
+  const atWork = (S) => S.location === "work" && S.activity === "sit" && !S.forced;
 
   // chance = expected times per hour while the condition holds; max = per day.
   const random = [
     {
       id: "sensor_error",
-      chance: 0.05,
+      chance: 0.04,
       max: 1,
       when: (S) => S.cgm.status === "ok" && S.activity !== "sleep",
       run(api) {
         const c = api.S.cgm;
         c.status = "error";
-        c.errorUntil = api.S.t + Math.round(M.rand(45, 150));
+        c.errorUntil = api.S.t + Math.round(M.rand(30, 120));
         c.errorFails = Math.random() < 0.4;
-        api.log("CGM: Sensor error. No readings. You're flying blind unless you fingerstick.", "warn");
+        api.log("G7: Brief sensor issue. No readings. Your pod drops to Limited Mode and can't adjust insulin.", "warn");
       },
     },
     {
-      id: "adhesive",
+      id: "signal_loss",
+      chance: 0.12,
+      max: 1,
+      when: (S) => S.cgm.status === "ok" && S.location === "work" && S.activity !== "driving",
+      run(api) {
+        api.S.cgm.signalLostUntil = api.S.t + Math.round(M.rand(25, 50));
+        api.log("You walked away from your phone. Your G7 has nothing to talk to: signal loss.", "info");
+      },
+    },
+    {
+      id: "ripped_off",
       chance: 0.5,
       max: 1,
-      when: (S) => S.cgm.status !== "none" && (S.activity === "gym" || (S.activity === "outside" && M.temperature(S.t) >= 85)),
+      when: (S) => S.activity === "cardio" || S.activity === "lift" || (S.activity === "outside" && M.temperature(S.t) >= 85),
       run(api) {
-        api.S.cgm.status = "none";
-        api.log(
-          "Sweat loosened the adhesive and your sensor caught on a door frame. It's gone. A new one needs a 2-hour warm-up.",
-          "bad"
-        );
+        const S = api.S;
+        if (Math.random() < 0.5 && S.cgm.status !== "none") {
+          S.cgm.status = "none";
+          api.log("Sweat loosened the adhesive and your G7 caught on a door frame. It's gone.", "bad");
+        } else if (S.pod.attached) {
+          S.pod.attached = false;
+          api.podAlarm("Pod ripped off", "Sweat loosened the adhesive and your pod caught on a door frame. No insulin is going in until you put on a new one.");
+        }
+      },
+    },
+    {
+      id: "occlusion",
+      chance: 0.025,
+      max: 1,
+      when: (S) => M.podWorking(S.pod) && !S.pod.occluded,
+      run(api) {
+        // Silent. The pod won't notice until it's missed a couple of units.
+        api.S.pod.occluded = true;
+        api.S.notes.push(`${api.fmt(api.S.t)}: your pod's cannula kinked. Insulin stopped reaching you long before the alarm went off.`);
+      },
+    },
+    {
+      id: "pod_error",
+      chance: 0.015,
+      max: 1,
+      when: (S) => M.podWorking(S.pod),
+      run(api) {
+        api.S.pod.failed = true;
+        api.podAlarm("Pod error", "Your pod is screaming. It's failed and stopped delivering insulin. You need to change it now.");
       },
     },
     {
       id: "donuts",
       chance: 0.8,
       max: 1,
-      when: (S) => S.location === "work" && M.tod(S.t) > at(8, 30) && M.tod(S.t) < at(11, 30) && S.activity === "sit",
+      when: (S) => atWork(S) && M.tod(S.t) > at(8, 30) && M.tod(S.t) < at(11, 30),
       run(api) {
         api.modal({
           title: "Donuts in the break room",
@@ -183,7 +234,7 @@
       id: "cake",
       chance: 0.4,
       max: 1,
-      when: (S) => S.location === "work" && M.tod(S.t) > at(14, 0) && M.tod(S.t) < at(16, 30) && S.activity === "sit",
+      when: (S) => atWork(S) && M.tod(S.t) > at(14, 0) && M.tod(S.t) < at(16, 30),
       run(api) {
         api.modal({
           title: "Birthday cake",
@@ -206,6 +257,29 @@
       },
     },
     {
+      id: "insurance",
+      chance: 0.3,
+      max: 1,
+      when: (S) => atWork(S) && M.tod(S.t) > at(10, 0) && M.tod(S.t) < at(16, 0),
+      run(api) {
+        api.S.stress = Math.min(1, api.S.stress + 0.2);
+        api.log(`${pick(INSURANCE)} You spend your break on hold.`, "warn");
+        api.force("sit", 25, "On hold with insurance");
+      },
+    },
+    {
+      id: "meal_delay",
+      chance: 1.5,
+      max: 1,
+      when: (S) => S.carbs.some((c) => c.t > S.t) && S.location === "work",
+      run(api) {
+        const S = api.S;
+        for (const c of S.carbs) if (c.t > S.t) c.t += 20;
+        for (const m of S.markers) if (m.type === "carb" && m.t > S.t) m.t += 20;
+        api.log('Your manager stops you to "quickly" go over something. Your food waits. Your insulin doesn\'t.', "warn");
+      },
+    },
+    {
       id: "unexplained",
       chance: 0.1,
       max: 1,
@@ -217,34 +291,36 @@
       },
     },
     {
-      id: "hot_pen",
+      id: "hot_car",
       chance: 0.2,
       max: 1,
-      when: (S) => S.location === "work" && M.tod(S.t) > at(12, 30) && M.tod(S.t) < at(17, 0) && S.activity === "sit",
+      when: (S) => atWork(S) && M.tod(S.t) > at(12, 30) && M.tod(S.t) < at(17, 0),
       run(api) {
-        const carTemp = M.temperature(api.S.t) + 35;
+        const S = api.S;
+        const carTemp = M.temperature(S.t) + 35;
         api.modal({
-          title: "Your insulin was in the car",
+          title: "Your backup kit was in the car",
           body:
-            `You realize your rapid-acting pen has been in the car all day. It's about ${carTemp}°F in there. ` +
+            `Your spare pods and insulin vial have been sitting in a ${carTemp}°F car all day. ` +
             "Heat can ruin insulin, and you can't tell by looking at it.",
           choices: [
             {
-              label: "Keep using it, it's all you have",
+              label: "It's probably fine",
               run() {
-                api.S.potency = 0.55;
-                api.S.notes.push(`${api.fmt(api.S.t)}: the heat-damaged pen was only working at about 55% strength.`);
-                api.log("You keep using the pen and hope it's fine.", "warn");
+                S.supplies.heatDamaged = true;
+                api.log("You leave the kit in the car and hope for the best.", "warn");
               },
             },
             {
-              label: "Check your desk for the spare",
+              label: "Toss the vial, use your spare",
               run() {
-                if (Math.random() < 0.5) api.log("Found the spare pen in your desk drawer. Past you did something right.", "good");
-                else {
-                  api.S.potency = 0.55;
-                  api.S.notes.push(`${api.fmt(api.S.t)}: the heat-damaged pen was only working at about 55% strength.`);
-                  api.log("The drawer is empty. You used the spare last month. Back to the hot pen.", "warn");
+                if (S.supplies.vials > 0) {
+                  S.supplies.vials--;
+                  S.supplies.vialAgeDays = 0;
+                  api.log("You toss the cooked vial. That's a few hundred dollars of insulin in the trash.", "info");
+                } else {
+                  S.supplies.heatDamaged = true;
+                  api.log("You don't have a spare vial. You'll have to use the hot one next time you change your pod.", "warn");
                 }
               },
             },
@@ -259,7 +335,7 @@
       when: (S) => S.activity === "sleep" && S.cgm.status === "ok",
       run(api) {
         api.S.cgm.compressionUntil = api.S.t + 35;
-        api.S.notes.push(`${api.fmt(api.S.t)}: you rolled onto your sensor. It read falsely low (a "compression low").`);
+        api.S.notes.push(`${api.fmt(api.S.t)}: you rolled onto your G7. It read falsely low (a "compression low"), so your pod cut your insulin for nothing.`);
       },
     },
   ];

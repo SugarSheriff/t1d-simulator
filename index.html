@@ -40,8 +40,8 @@
         <div class="legend">
           <span><i class="sw band"></i>Target 70–180</span>
           <span><i class="sw tri"></i>Food</span>
-          <span><i class="sw bar ins"></i>Rapid insulin</span>
-          <span><i class="sw bar la"></i>Long-acting</span>
+          <span><i class="sw bar ins"></i>Bolus</span>
+          <span><i class="sw strip"></i>Pod delivery (gray = suspended, red = none)</span>
           <span><i class="sw dia"></i>Fingerstick</span>
         </div>
         <div class="meters">
@@ -55,23 +55,29 @@
         <h2>Eat</h2>
         <div id="menu" class="menu"></div>
 
-        <h2>Insulin</h2>
+        <h2>Omnipod 5</h2>
+        <div class="pod">
+          <div><span id="pod-mode" class="pod-mode ok">Automated</span> <span id="pod-delivery" class="pod-sub"></span></div>
+          <div id="pod-age" class="pod-sub"></div>
+          <div id="supplies" class="pod-sub"></div>
+        </div>
         <div class="dose">
           <button id="dose-minus" aria-label="Less insulin">−</button>
           <output><span id="dose">0.0</span> u</output>
           <button id="dose-plus" aria-label="More insulin">+</button>
-          <button id="bolus" class="primary">Take rapid</button>
+          <button id="bolus" class="primary">Correction bolus</button>
         </div>
         <div class="row">
-          <button id="basal">Take long-acting</button>
+          <button id="activity-mode">Activity feature</button>
+          <button id="change-pod">Change pod</button>
         </div>
-        <p class="hint">Use "Take rapid" for corrections. Meals get dosed when you eat.</p>
+        <p class="hint">Meals get bolused when you eat them.</p>
 
         <h2>Check</h2>
         <div class="row">
           <button id="fingerstick">Fingerstick</button>
           <button id="ketones">Ketone strip</button>
-          <button id="sensor">New CGM sensor</button>
+          <button id="sensor">New G7 sensor</button>
         </div>
 
         <h2>Do</h2>
@@ -79,7 +85,8 @@
           <button data-act="sit">Couch</button>
           <button data-act="walk">Walk</button>
           <button data-act="outside">Go outside</button>
-          <button data-act="gym">Work out</button>
+          <button data-act="cardio">Run</button>
+          <button data-act="lift">Lift</button>
           <button data-act="sleep">Sleep</button>
           <button id="water">Drink water</button>
         </div>
