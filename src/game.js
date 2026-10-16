@@ -27,7 +27,7 @@
   }
 
   function newStats() {
-    return { minutes: 0, inRange: 0, sum: 0, lows: 0, highs: 0, decisions: 0, alarms: 0, wakeups: 0, inLow: false, inHigh: false, min: 999, max: 0 };
+    return { minutes: 0, inRange: 0, sum: 0, lows: 0, highs: 0, decisions: 0, alarms: 0, wakeups: 0, inLow: false, inHigh: false, min: 999, max: 0, mathTotal: 0, mathRight: 0, doseOff: 0 };
   }
 
   function reset() {
@@ -128,12 +128,90 @@
     S.forced = { activity: act, until: S.t + minutes, reason, onEnd };
   }
 
+  // Nothing goes in your mouth without math: count the carbs, then work out the dose yourself.
   function eat(id) {
-    const r = M.eat(S, id);
-    S.stats.decisions++;
-    log(`You eat: ${r.food.name} (${r.food.label} carbs).`, "food");
-    if (r.food.fast) log("Rule of 15: wait 15 minutes, then check again. It's tempting to keep eating. Don't.", "info");
-    if (Math.abs(r.grams - r.labeled) >= 10) S.notes.push(`${fmt(S.t)}: the ${r.food.name.toLowerCase()} was really ${r.grams} g of carbs, not ${r.food.label}.`);
+    const serv = M.serving(id);
+    const f = serv.food;
+    const r = latestReading();
+    const iob = M.iob(S);
+    const qty = (q) => (q === 0.5 ? "½" : q === 0.75 ? "¾" : q === 1.25 ? "1¼" : q === 1.5 ? "1½" : String(q));
+    const wrap = document.createElement("div");
+    wrap.className = "count";
+    wrap.innerHTML = `
+      ${f.note ? `<p class="hint">${f.note}</p>` : ""}
+      <table>
+        <thead><tr><th>Item</th><th>Carbs per serving</th><th>You're having</th></tr></thead>
+        <tbody>${serv.rows
+          .map((row) => `<tr><td>${row.item}</td><td>${row.carbs} g per ${row.per}</td><td>${qty(row.qty)} × (${row.per})</td></tr>`)
+          .join("")}</tbody>
+      </table>
+      <div class="count-inputs">
+        <label>Total carbs (g)<input id="count-carbs" type="number" min="0" max="400" step="1" inputmode="numeric"></label>
+        <label>Rapid insulin (units)<input id="count-units" type="number" min="0" max="25" step="0.5" inputmode="decimal"></label>
+      </div>
+      <dl>
+        <dt>Latest glucose</dt><dd>${r ? `${r.v} mg/dL (${r.src})` : "No recent reading. You're guessing."}</dd>
+        <dt>Insulin on board</dt><dd>${iob.toFixed(1)} u</dd>
+        <dt>Your numbers</dt><dd>1 u per ${P.carbRatio} g carbs · 1 u drops ~${P.isf} mg/dL · target ${P.target}</dd>
+      </dl>
+      <p class="hint">Dose = carbs ÷ ${P.carbRatio} + (glucose − ${P.target}) ÷ ${P.isf} − insulin on board. Round to the nearest 0.5.
+      Treating a low? You usually take 0.</p>
+      <p class="count-error" role="alert"></p>`;
+
+    modal({
+      title: `Count it: ${f.name}`,
+      node: wrap,
+      choices: [
+        {
+          label: "Eat it",
+          run() {
+            const carbsIn = wrap.querySelector("#count-carbs").value.trim();
+            const unitsIn = wrap.querySelector("#count-units").value.trim();
+            const err = wrap.querySelector(".count-error");
+            if (carbsIn === "" || isNaN(Number(carbsIn))) {
+              err.textContent = "Add up the carbs first. Nobody's going to do it for you.";
+              return false;
+            }
+            if (unitsIn === "" || isNaN(Number(unitsIn))) {
+              err.textContent = "Decide on a dose. Enter 0 if you're not taking any.";
+              return false;
+            }
+            const counted = Math.max(0, Math.round(Number(carbsIn)));
+            const units = Math.max(0, Math.round(Number(unitsIn) * 2) / 2);
+            finishEating(serv, counted, units, r, iob);
+          },
+        },
+        { label: "Never mind", run: () => log(`You decide not to have the ${f.name.toLowerCase()}.`, "info") },
+      ],
+    });
+    setTimeout(() => wrap.querySelector("#count-carbs")?.focus(), 0);
+  }
+
+  function finishEating(serv, counted, units, reading, iob) {
+    const f = serv.food;
+    const st = S.stats;
+    M.eat(S, serv, counted);
+    if (units > 0) M.bolus(S, units);
+    log(`You eat: ${f.name}. You counted ${counted} g${units > 0 ? ` and took ${units} u` : " and took no insulin"}.`, "food");
+
+    st.mathTotal++;
+    if (Math.abs(counted - serv.answer) <= Math.max(2, serv.answer * 0.05)) {
+      st.mathRight++;
+      log("Your carb math checks out.", "good");
+    } else {
+      log(`Check your math: those numbers add up to ${serv.answer} g, not ${counted} g.`, "warn");
+    }
+
+    const correction = reading ? (reading.v - P.target) / P.isf : 0;
+    const ideal = Math.max(0, Math.round((serv.answer / P.carbRatio + correction - iob) * 2) / 2);
+    if (Math.abs(units - ideal) >= 1) {
+      st.doseOff++;
+      S.notes.push(`${fmt(S.t)}: ${f.name.toLowerCase()}: the dose math said about ${ideal} u, you took ${units} u.`);
+    }
+    if (Math.abs(serv.actual - serv.answer) >= 8) {
+      S.notes.push(`${fmt(S.t)}: the ${f.name.toLowerCase()} was really ${serv.actual} g of carbs. The math said ${serv.answer} g. You can do it right and still be wrong.`);
+    }
+    if (f.fast) log("Rule of 15: wait 15 minutes, then check again. It's tempting to keep eating. Don't.", "info");
     render();
   }
 
@@ -346,6 +424,8 @@
           <div><b>${st.lows}</b><span>lows</span></div>
           <div><b>${st.highs}</b><span>highs over 250</span></div>
           <div><b>${st.decisions}</b><span>decisions you made</span></div>
+          <div><b>${st.mathRight}/${st.mathTotal}</b><span>carb counts right</span></div>
+          <div><b>${st.doseOff}</b><span>doses off by 1u+</span></div>
           <div><b>${st.alarms}</b><span>CGM alarms</span></div>
           <div><b>${st.wakeups}</b><span>times woken up at night</span></div>
           <div><b>${Math.round(st.min)}–${Math.round(st.max)}</b><span>lowest–highest</span></div>
@@ -595,7 +675,8 @@
     for (const id of T1D.MENU) {
       const f = M.FOODS[id];
       const b = document.createElement("button");
-      b.innerHTML = `<span>${f.name}</span><small>${f.label}</small>`;
+      const tag = f.fast ? "for lows" : f.error >= 0.2 ? "no label" : "label";
+      b.innerHTML = `<span>${f.name}</span><small>${tag}</small>`;
       if (f.fast) b.classList.add("fast");
       b.onclick = () => eat(id);
       menu.appendChild(b);
@@ -617,7 +698,6 @@
       doseUnits = 0;
       render();
     };
-    $("#calc").onclick = openCalculator;
     $("#basal").onclick = () => {
       M.takeBasal(S);
       S.stats.decisions++;
@@ -674,47 +754,6 @@
     window.addEventListener("resize", () => S && drawGraph());
   }
 
-  function openCalculator() {
-    const wrap = document.createElement("div");
-    wrap.className = "calc";
-    const r = latestReading();
-    const iob = M.iob(S);
-    wrap.innerHTML = `
-      <label>Carbs you're about to eat (g)<input id="calc-carbs" type="number" min="0" max="300" value="0" inputmode="numeric"></label>
-      <dl>
-        <dt>Latest glucose</dt><dd>${r ? `${r.v} mg/dL (${r.src})` : "No recent reading. Check first!"}</dd>
-        <dt>Insulin on board</dt><dd>${iob.toFixed(1)} u</dd>
-        <dt>Your settings</dt><dd>1 u : ${P.carbRatio} g carbs · 1 u drops ~${P.isf} · target ${P.target}</dd>
-      </dl>
-      <p class="calc-out">Suggested: <b id="calc-result">0.0</b> units</p>
-      <p class="hint">The math is only as good as your carb guess, your last reading, and what your body decides to do today.</p>`;
-    let suggestion = 0;
-    const update = () => {
-      const carbs = Math.max(0, Number(wrap.querySelector("#calc-carbs").value) || 0);
-      const corr = r ? (r.v - P.target) / P.isf : 0;
-      suggestion = Math.max(0, Math.round((carbs / P.carbRatio + corr - iob) * 2) / 2);
-      wrap.querySelector("#calc-result").textContent = suggestion.toFixed(1);
-    };
-    wrap.querySelector("#calc-carbs").addEventListener("input", update);
-    update();
-    modal({
-      title: "Bolus calculator",
-      node: wrap,
-      noDecision: true,
-      choices: [
-        {
-          label: "Use this dose",
-          run() {
-            doseUnits = suggestion;
-            S.stats.decisions++;
-          },
-        },
-        { label: "Cancel", run() {} },
-      ],
-    });
-    setTimeout(() => wrap.querySelector("#calc-carbs").select(), 0);
-  }
-
   function start() {
     reset();
     setSpeed(0);
@@ -728,7 +767,9 @@
         and the clock keeps running whether you're ready or not.</p>
         <ul class="intro">
           <li><b>Goal:</b> keep blood sugar between <b>70 and 180</b>. Below 70 is a low (dangerous fast). Above 250 is a high (dangerous slow).</li>
-          <li><b>Rapid insulin:</b> 1 unit covers ~${P.carbRatio} g of carbs and drops you ~${P.isf} mg/dL. It peaks in about 75 minutes and lasts 5 hours.</li>
+          <li><b>Rapid insulin:</b> 1 unit covers ${P.carbRatio} g of carbs and drops you ~${P.isf} mg/dL. It peaks in about 75 minutes and lasts 5 hours.</li>
+          <li><b>You do the math.</b> Everything you eat or drink means reading labels, adding up carbs, and working out your dose:
+          carbs ÷ ${P.carbRatio} + (glucose − ${P.target}) ÷ ${P.isf} − insulin on board. No calculator.</li>
           <li><b>Long-acting insulin:</b> ${P.basalUnits} units once a day, usually in the morning. Forget it and you'll climb all day. Take it twice and you'll crash.</li>
           <li><b>Your CGM</b> is about 10 minutes behind your real blood sugar, a little noisy, and sometimes just wrong. Fingersticks are accurate.</li>
           <li><b>Time:</b> 1 second = 1 minute. Pause with the ❚❚ button or the space bar.</li>

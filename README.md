@@ -4,7 +4,11 @@ A real-time type 1 diabetes simulator. You live through one day as a software de
 and the clock keeps running the whole time. Blood sugar is always moving, so there are no turns.
 
 People hear "diabetes" and think it means skipping dessert. This simulator shows what it is really like:
-- **Food is a guess.** Restaurant and break-room carbs are estimates, and the real number is hidden from you.
+- **You do the math.** Every food or drink opens a "Count it" screen. You read the labels (carbs per serving),
+  multiply by how much you're actually having, add it all up, and work out your own insulin dose:
+  `carbs ÷ 10 + (glucose − 110) ÷ 40 − insulin on board`. There's no calculator.
+- **Food is still a guess.** Restaurant and break-room food has no label, so you only get estimates. Even perfect math
+  can be wrong, and the real carbs are only revealed at the end of the day.
 - **Insulin is slow and strong.** Rapid insulin peaks around 75 minutes and lasts 5 hours. Stacking doses causes crashes.
 - **Long-acting insulin is on you.** Forget it and you'll climb all day toward DKA. Take it twice and you'll go low.
 - **Everything moves the number.** That includes stress, heat, standing outside, exercise (for hours afterward), dehydration,
@@ -16,7 +20,7 @@ People hear "diabetes" and think it means skipping dessert. This simulator shows
 - **Nights aren't off.** Alarms wake you up, and lost sleep makes the next day harder.
 
 At the end of the day you get your time in range, lows, highs, alarms, the number of decisions you made,
-and a list of things that happened that you never saw.
+how many carb counts you got right, which doses were off, and a list of things that happened that you never saw.
 
 ## Run it
 

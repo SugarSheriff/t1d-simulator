@@ -63,8 +63,8 @@
             "The team is heading to a BBQ place. Sweet sauce, sides, and no nutrition labels. " +
             "Restaurant carb counts are basically guesses, and fat keeps it hitting for hours.",
           choices: [
-            { label: "Go: brisket plate + sides (~75 g?)", run: () => api.eat("bbq") },
-            { label: "Eat the sandwich you packed (~45 g)", run: () => api.eat("sandwich") },
+            { label: "Go: BBQ plate with sides", run: () => api.eat("bbq") },
+            { label: "Eat the sandwich you packed", run: () => api.eat("sandwich") },
             {
               label: "Skip lunch",
               run() {
