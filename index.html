@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Type 1: A Day</title>
+    <meta name="description" content="A real-time type 1 diabetes simulator. Get through one day. It never stops." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">Type 1<span>: A Day</span></div>
+      <div class="clock"><span id="day">Day 1</span><span id="time">6:45 AM</span></div>
+      <div class="speed" role="group" aria-label="Simulation speed">
+        <button data-speed="0" aria-label="Pause">❚❚</button>
+        <button data-speed="1">1×</button>
+        <button data-speed="4">4×</button>
+        <button data-speed="15">15×</button>
+        <button id="sound" aria-pressed="true">Sound on</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel monitor" aria-label="Glucose monitor">
+        <div class="reading-row">
+          <div class="reading">
+            <div class="reading-num"><span id="cgm-value" class="cgm-value">---</span><span id="cgm-arrow" class="cgm-arrow"></span></div>
+            <div class="cgm-unit">mg/dL</div>
+            <div id="cgm-status" class="cgm-status">CGM</div>
+          </div>
+          <dl class="vitals">
+            <div><dt>Last fingerstick</dt><dd id="finger">—</dd></div>
+            <div><dt>Insulin on board</dt><dd id="iob">0.0 u</dd></div>
+            <div><dt>Carbs on board (your estimate)</dt><dd id="cob">0 g</dd></div>
+            <div><dt>How you feel</dt><dd id="feel">Okay</dd></div>
+            <div><dt>What you're doing</dt><dd id="where">On the couch</dd></div>
+          </dl>
+        </div>
+        <canvas id="graph" aria-label="Last 6 hours of CGM readings"></canvas>
+        <div class="legend">
+          <span><i class="sw band"></i>Target 70–180</span>
+          <span><i class="sw tri"></i>Food</span>
+          <span><i class="sw bar ins"></i>Rapid insulin</span>
+          <span><i class="sw bar la"></i>Long-acting</span>
+          <span><i class="sw dia"></i>Fingerstick</span>
+        </div>
+        <div class="meters">
+          <div class="meter"><span>Hydration</span><div class="track"><div id="m-hydration"></div></div></div>
+          <div class="meter"><span>Rest</span><div class="track"><div id="m-rest"></div></div></div>
+          <div class="meter"><span>Stress</span><div class="track"><div id="m-stress"></div></div></div>
+        </div>
+      </section>
+
+      <aside class="panel controls" aria-label="Actions">
+        <h2>Eat</h2>
+        <div id="menu" class="menu"></div>
+
+        <h2>Insulin</h2>
+        <div class="dose">
+          <button id="dose-minus" aria-label="Less insulin">−</button>
+          <output><span id="dose">0.0</span> u</output>
+          <button id="dose-plus" aria-label="More insulin">+</button>
+          <button id="bolus" class="primary">Take rapid</button>
+        </div>
+        <div class="row">
+          <button id="calc">Bolus calculator</button>
+          <button id="basal">Take long-acting</button>
+        </div>
+
+        <h2>Check</h2>
+        <div class="row">
+          <button id="fingerstick">Fingerstick</button>
+          <button id="ketones">Ketone strip</button>
+          <button id="sensor">New CGM sensor</button>
+        </div>
+
+        <h2>Do</h2>
+        <div class="row acts">
+          <button data-act="sit">Couch</button>
+          <button data-act="walk">Walk</button>
+          <button data-act="outside">Go outside</button>
+          <button data-act="gym">Work out</button>
+          <button data-act="sleep">Sleep</button>
+          <button id="water">Drink water</button>
+        </div>
+        <p id="lock-note" class="lock-note"></p>
+      </aside>
+
+      <section class="panel feed" aria-label="Event log">
+        <h2>What's happening</h2>
+        <ol id="log" aria-live="polite"></ol>
+      </section>
+
+      <section class="panel stats" aria-label="Today so far">
+        <div><b id="tir">—</b><span>time in range</span></div>
+        <div><b id="decisions">0</b><span>decisions</span></div>
+        <div><b id="alarms">0</b><span>alarms</span></div>
+        <div><b id="lows">0</b><span>lows</span></div>
+      </section>
+    </main>
+
+    <footer class="foot">Simplified simulation for awareness. Not medical advice. Never use it for real dosing.</footer>
+
+    <div id="modal" class="modal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <h2 id="modal-title"></h2>
+        <div id="modal-body"></div>
+        <div id="modal-actions" class="modal-actions"></div>
+      </div>
+    </div>
+
+    <script src="src/model.js"></script>
+    <script src="src/events.js"></script>
+    <script src="src/game.js"></script>
+  </body>
+</html>
