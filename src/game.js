@@ -44,6 +44,7 @@
   }
 
   function reset() {
+    $("#retry").hidden = true;
     S = M.createState(START);
     S.stats = newStats();
     S.fired = new Set();
@@ -637,7 +638,7 @@
     const now = performance.now();
     const dt = Math.min(1100, now - lastFrame);
     lastFrame = now;
-    if (speed > 0 && !modalOpen) {
+    if (speed > 0 && !modalOpen && !S.over) {
       acc += (dt * speed) / 1000;
       let n = 0;
       while (acc >= 1 && n < 120) {
@@ -711,6 +712,8 @@
 
   function gameOver() {
     setSpeed(0);
+    S.over = true; // stop the shaking and blur so people can actually see what happened
+    render();
     const low = S.dead === "low";
     modal({
       title: low ? "Severe hypoglycemia" : "Diabetic ketoacidosis (DKA)",
@@ -719,7 +722,16 @@
       body: low
         ? "Your blood sugar stayed too low for too long and you lost consciousness. In real life this is an emergency: someone has to give you glucagon or call 911. It can happen at your desk, behind the wheel, or in your sleep."
         : "Without insulin, your body started burning fat for fuel and your blood turned acidic. Nausea, vomiting, confusion. On a pump there's no long-acting insulin in the background, so a failed pod can get you here in hours. In real life you'd be in the ER, maybe the ICU, on an IV insulin drip.",
-      choices: [{ label: "Try again", run: () => start() }],
+      choices: [
+        { label: "Try again", run: () => start() },
+        {
+          label: "Look at what happened",
+          run() {
+            $("#retry").hidden = false;
+            log(low ? "You passed out." : "You ended up in the ER with DKA.", "bad");
+          },
+        },
+      ],
     });
   }
 
@@ -828,10 +840,12 @@
     $("#lows").textContent = st.lows;
 
     $("#dose").textContent = doseUnits.toFixed(1);
-    document.body.classList.toggle("sym-low", S.bg < 70 && S.bg >= 54);
-    document.body.classList.toggle("sym-severe", S.bg < 54);
-    document.body.classList.toggle("sym-high", S.bg > 250);
-    document.body.classList.toggle("asleep", S.activity === "sleep");
+    const fx = !S.over;
+    document.body.classList.toggle("sym-low", fx && S.bg < 70 && S.bg >= 54);
+    document.body.classList.toggle("sym-severe", fx && S.bg < 54);
+    document.body.classList.toggle("sym-high", fx && S.bg > 250);
+    document.body.classList.toggle("asleep", fx && S.activity === "sleep");
+    document.body.classList.toggle("over", !!S.over);
 
     const locked = !!S.forced;
     document.querySelectorAll("[data-act]").forEach((b) => {
@@ -989,6 +1003,7 @@
       render();
     };
     $("#change-pod").onclick = changePod;
+    $("#retry").onclick = () => start();
     $("#activity-mode").onclick = () => {
       S.stats.decisions++;
       if (S.t < S.pod.activityUntil) {

@@ -247,3 +247,6 @@ body.asleep .topbar, body.asleep main { filter: brightness(0.7); }
 .timing legend { font-size: 12px; color: var(--muted); padding: 0; margin-bottom: 4px; }
 .options { display: grid; gap: 6px; margin: 10px 0; font-size: 14px; }
 body.sym-severe .modal-card { filter: blur(1.2px); }
+.retry { position: fixed; right: 16px; bottom: 16px; z-index: 15; padding: 12px 18px; font-weight: 600; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+.retry[hidden] { display: none; }
+body.over .controls, body.over .speed { pointer-events: none; opacity: 0.5; }
