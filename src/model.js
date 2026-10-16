@@ -56,21 +56,100 @@
     return x < D / 2 ? (2 * x * x) / (D * D) : 1 - (2 * (D - x) * (D - x)) / (D * D);
   }
 
+  // Every food is a math problem: carbs per serving × how much you're actually eating.
+  // `error` is how far reality can drift from that math (labels are close, eyeballing isn't, restaurants are a guess).
   const FOODS = {
-    tabs: { name: "Glucose tabs (4)", label: "16 g", min: 16, max: 16, duration: 25, delay: 3, fast: true },
-    juice: { name: "Juice box", label: "15 g", min: 15, max: 15, duration: 30, delay: 5, fast: true },
-    apple: { name: "Apple", label: "~20 g", min: 15, max: 26, duration: 70, delay: 10 },
-    granola: { name: "Granola bar", label: "25 g", min: 23, max: 28, duration: 75, delay: 10 },
-    cereal: { name: "Cereal & milk", label: "~50 g", min: 44, max: 62, duration: 70, delay: 5 },
-    eggs: { name: "Eggs & toast", label: "~15 g", min: 12, max: 20, duration: 100, delay: 15 },
-    sandwich: { name: "Sandwich", label: "~45 g", min: 38, max: 56, duration: 120, delay: 15 },
-    salad: { name: "Chicken salad", label: "~10 g", min: 6, max: 15, duration: 90, delay: 15 },
-    pasta: { name: "Pasta", label: "~80 g", min: 65, max: 98, duration: 150, delay: 15 },
-    pizza: { name: "Pizza (2 slices)", label: "~70 g", min: 58, max: 92, duration: 240, delay: 60 },
-    donut: { name: "Donut", label: "~30 g?", min: 28, max: 50, duration: 60, delay: 5 },
-    bbq: { name: "BBQ plate + sides", label: "~75 g?", min: 60, max: 112, duration: 210, delay: 35 },
-    cake: { name: "Birthday cake", label: "~40 g?", min: 35, max: 62, duration: 70, delay: 10 },
+    tabs: {
+      name: "Glucose tabs", fast: true, duration: 25, delay: 3, error: 0,
+      parts: [{ item: "Glucose tab", per: "1 tab", carbs: 4, qty: [3, 4, 5] }],
+    },
+    juice: {
+      name: "Juice box", fast: true, duration: 30, delay: 5, error: 0.02,
+      parts: [{ item: "Apple juice", per: "1 box (4.2 oz)", carbs: 15, qty: [1, 2] }],
+    },
+    apple: {
+      name: "Apple", duration: 70, delay: 10, error: 0.2, note: "Apples aren't labeled. Size changes everything.",
+      parts: [{ item: "Apple", per: "1 medium apple", carbs: 25, qty: [0.75, 1, 1.25] }],
+    },
+    granola: {
+      name: "Granola bar", duration: 75, delay: 10, error: 0.03,
+      parts: [{ item: "Granola bar", per: "1 bar", carbs: 26, qty: [1, 2] }],
+    },
+    cereal: {
+      name: "Cereal & milk", duration: 70, delay: 5, error: 0.12, note: "You poured without measuring. Nobody measures.",
+      parts: [
+        { item: "Cereal", per: "1 cup", carbs: 24, qty: [1, 1.5, 2] },
+        { item: "Milk", per: "1 cup", carbs: 12, qty: [0.5, 1] },
+      ],
+    },
+    eggs: {
+      name: "Eggs & toast", duration: 100, delay: 15, error: 0.05,
+      parts: [
+        { item: "Eggs", per: "2 eggs", carbs: 1, qty: [1] },
+        { item: "Toast", per: "1 slice", carbs: 15, qty: [1, 2] },
+        { item: "Jam", per: "1 tbsp", carbs: 13, qty: [0, 1] },
+      ],
+    },
+    sandwich: {
+      name: "Sandwich", duration: 120, delay: 15, error: 0.06,
+      parts: [
+        { item: "Bread", per: "1 slice", carbs: 18, qty: [2] },
+        { item: "Turkey & cheese", per: "1 serving", carbs: 2, qty: [1] },
+        { item: "Chips", per: "1 oz bag", carbs: 15, qty: [0, 1] },
+      ],
+    },
+    salad: {
+      name: "Chicken salad", duration: 90, delay: 15, error: 0.1,
+      parts: [
+        { item: "Greens & chicken", per: "1 bowl", carbs: 6, qty: [1] },
+        { item: "Dressing", per: "2 tbsp", carbs: 5, qty: [1, 2] },
+        { item: "Croutons", per: "1/4 cup", carbs: 10, qty: [0, 1, 2] },
+      ],
+    },
+    pasta: {
+      name: "Pasta", duration: 150, delay: 15, error: 0.12,
+      parts: [
+        { item: "Spaghetti (cooked)", per: "1 cup", carbs: 43, qty: [1, 1.5, 2] },
+        { item: "Marinara", per: "1/2 cup", carbs: 13, qty: [1] },
+        { item: "Garlic bread", per: "1 slice", carbs: 20, qty: [0, 1, 2] },
+      ],
+    },
+    pizza: {
+      name: "Pizza", duration: 240, delay: 60, error: 0.12, note: "The fat delays it. This one hits hours later.",
+      parts: [{ item: "Large pizza", per: "1 slice", carbs: 36, qty: [2, 3] }],
+    },
+    donut: {
+      name: "Donut", duration: 60, delay: 5, error: 0.3, note: "No label. A carb app says glazed donuts run 25–45 g.",
+      parts: [{ item: "Glazed donut (app's guess)", per: "1 donut", carbs: 31, qty: [1] }],
+    },
+    bbq: {
+      name: "BBQ plate", duration: 210, delay: 35, error: 0.25, note: "No labels. These are guesses from a carb app. Sauces are sneaky.",
+      parts: [
+        { item: "Brisket", per: "1 serving", carbs: 0, qty: [1] },
+        { item: "BBQ sauce", per: "2 tbsp", carbs: 16, qty: [1, 1.5, 2] },
+        { item: "Baked beans", per: "1/2 cup", carbs: 24, qty: [1, 1.5] },
+        { item: "Fries", per: "1 small order", carbs: 40, qty: [0, 1] },
+        { item: "White bread", per: "1 slice", carbs: 13, qty: [1, 2] },
+      ],
+    },
+    cake: {
+      name: "Birthday cake", duration: 70, delay: 10, error: 0.25, note: "Grocery store sheet cake. Frosting is pure sugar.",
+      parts: [{ item: "Sheet cake w/ frosting", per: '2"×2" square', carbs: 30, qty: [1, 1.5, 2] }],
+    },
   };
+
+  // Rolls how much you're actually eating this time and what the carbs really are.
+  function serving(id) {
+    const f = FOODS[id];
+    const rows = [];
+    for (const p of f.parts) {
+      const qty = p.qty[Math.floor(Math.random() * p.qty.length)];
+      if (qty > 0) rows.push({ item: p.item, per: p.per, carbs: p.carbs, qty });
+    }
+    const answer = Math.round(rows.reduce((s, r) => s + r.carbs * r.qty, 0));
+    const actual = Math.max(0, Math.round(answer * (1 + gauss() * f.error * 0.6)));
+    return { id, food: f, rows, answer, actual };
+  }
   T1D.MENU = ["tabs", "juice", "apple", "granola", "cereal", "eggs", "sandwich", "salad", "pasta", "pizza"];
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -242,13 +321,11 @@
     return S.carbs.reduce((sum, c) => sum + c.labeled * (1 - carbAbsorbed(S.t - c.t, c)), 0);
   }
 
-  function eat(S, id) {
-    const f = FOODS[id];
-    const grams = Math.round(rand(f.min, f.max));
-    const labeled = parseInt(f.label.replace(/\D/g, ""), 10) || grams;
-    S.carbs.push({ t: S.t, grams, labeled, duration: f.duration, delay: f.delay, name: f.name });
+  // `counted` is what the player worked out. The body only cares about `actual`.
+  function eat(S, serv, counted) {
+    const f = serv.food;
+    S.carbs.push({ t: S.t, grams: serv.actual, labeled: counted, duration: f.duration, delay: f.delay, name: f.name });
     S.markers.push({ t: S.t, type: "carb", label: f.name });
-    return { food: f, grams, labeled };
   }
   function bolus(S, units) {
     S.boluses.push({ t: S.t, units, potency: S.potency });
@@ -266,7 +343,7 @@
   }
 
   T1D.model = {
-    PROFILE, FOODS, RAPID, createState, step, updateCGM, iob, cobEstimate, eat, bolus, takeBasal,
+    PROFILE, FOODS, RAPID, createState, step, updateCGM, iob, cobEstimate, serving, eat, bolus, takeBasal,
     fingerstick, temperature, tod, rand, clamp, insulinActivity,
   };
 })();
