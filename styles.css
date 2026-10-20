@@ -52,7 +52,6 @@ body {
   background: var(--bg);
   color: var(--text);
   font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  transition: filter 1.5s;
 }
 button {
   font: inherit;
@@ -165,10 +164,12 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .foot { text-align: center; color: var(--muted); font-size: 12px; padding: 4px 16px 20px; }
 
 /* Symptoms */
-body.sym-low main { animation: shake 0.35s infinite; }
-body.sym-severe main { animation: shake 0.2s infinite; filter: blur(1.6px); }
-body.sym-high { filter: saturate(0.45) brightness(0.92); }
-body.asleep .topbar, body.asleep main { filter: brightness(0.7); }
+/* Effects go on the panels, never on body or main: a filter or transform there breaks position: fixed. */
+.topbar, .layout > .panel { transition: filter 1.5s; }
+body.sym-low .layout > .panel { animation: shake 0.35s infinite; }
+body.sym-severe .layout > .panel { animation: shake 0.2s infinite; filter: blur(1.6px); }
+body.sym-high .topbar, body.sym-high .layout > .panel { filter: saturate(0.45) brightness(0.92); }
+body.asleep .topbar, body.asleep .layout > .panel { filter: brightness(0.7); }
 @keyframes shake {
   0%, 100% { transform: translate(0, 0); }
   25% { transform: translate(-1px, 1px); }
@@ -176,7 +177,7 @@ body.asleep .topbar, body.asleep main { filter: brightness(0.7); }
   75% { transform: translate(-1px, -1px); }
 }
 @media (prefers-reduced-motion: reduce) {
-  body.sym-low main, body.sym-severe main { animation: none; }
+  body.sym-low .layout > .panel, body.sym-severe .layout > .panel { animation: none; }
   .cgm-value.urgent { animation: none; }
 }
 
@@ -250,3 +251,133 @@ body.sym-severe .modal-card { filter: blur(1.2px); }
 .retry { position: fixed; right: 16px; bottom: 16px; z-index: 15; padding: 12px 18px; font-weight: 600; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
 .retry[hidden] { display: none; }
 body.over .controls, body.over .speed { pointer-events: none; opacity: 0.5; }
+
+/* ---------- Phones ---------- */
+.mini, .tabbar { display: none; }
+.controls .sec + .sec { margin-top: 14px; }
+button { touch-action: manipulation; }
+
+@media (max-width: 700px) {
+  body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+
+  /* Top bar: your number is always visible, even while scrolling the log. */
+  .topbar { padding: 8px 12px; gap: 10px; flex-wrap: nowrap; padding-top: calc(8px + env(safe-area-inset-top)); }
+  .brand { display: none; }
+  .mini { display: flex; align-items: baseline; gap: 3px; min-width: 64px; }
+  .mini .cgm-value { font-size: 28px; }
+  #mini-arrow { font-size: 18px; color: var(--muted); }
+  .clock { margin-left: auto; flex-direction: column; align-items: flex-end; gap: 0; line-height: 1.15; }
+  .clock #time { font-size: 17px; }
+  .clock #day { font-size: 11px; }
+  .speed { gap: 3px; }
+  .speed button { padding: 6px 8px; font-size: 13px; min-height: 38px; }
+  #sound { font-size: 0; width: 38px; }
+  #sound::before { content: "🔔"; font-size: 15px; }
+  #sound[aria-pressed="false"]::before { content: "🔕"; }
+
+  .layout { padding: 10px 12px; gap: 10px; grid-template-areas: "monitor" "stats" "feed"; }
+  .panel { padding: 12px; }
+  .reading-row { flex-direction: column; align-items: stretch; gap: 10px; }
+  .reading { min-width: 0; display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0 12px; }
+  .reading .cgm-unit { margin-bottom: 8px; }
+  .reading .cgm-status { flex-basis: 100%; margin-top: 0; }
+  .mini { opacity: 0; transition: opacity 0.2s; }
+  .mini.show { opacity: 1; }
+  .reading .cgm-value { font-size: 52px; }
+  .cgm-arrow { font-size: 30px; }
+  .vitals { grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+  .vitals dd { font-size: 14px; }
+  #graph { height: 190px; }
+  .legend { font-size: 11px; gap: 2px 10px; }
+  .meters { gap: 10px; }
+  .stats b { font-size: 18px; }
+  #log { max-height: 55vh; }
+  #log time { width: 58px; }
+
+  /* Actions live in a bottom sheet, so your number stays on screen above it. */
+  .controls {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(62px + env(safe-area-inset-bottom));
+    z-index: 12;
+    max-height: 58vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 16px 16px 0 0;
+    border-bottom: 0;
+    box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.28);
+    transform: translateY(calc(100% + 80px));
+    visibility: hidden;
+    transition: transform 0.22s ease, visibility 0s linear 0.22s;
+  }
+  .controls.open { transform: none; visibility: visible; transition: transform 0.22s ease; }
+  body.sym-low .layout > .controls, body.sym-severe .layout > .controls { animation: none; }
+  .controls .sec { display: none; }
+  .controls .sec.active { display: block; }
+  .controls .sec + .sec { margin-top: 0; }
+  .controls button { min-height: 44px; }
+  .menu { grid-template-columns: 1fr 1fr; }
+  .dose output { min-width: 56px; }
+
+  .tabbar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 13;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  }
+  .tabbar button {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-height: 48px;
+    padding: 4px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .tabbar button.on { color: var(--accent); background: var(--bg); }
+  .tabbar .ico { font-size: 20px; line-height: 1; }
+  .tabbar button.alert::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    right: calc(50% - 20px);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--low);
+    border: 2px solid var(--panel);
+  }
+
+  /* Popups slide up from the bottom with their buttons always in reach. */
+  .modal { align-items: end; justify-items: stretch; padding: 0; }
+  .modal-card { width: 100%; max-height: 92vh; border-radius: 16px 16px 0 0; padding: 18px 16px 0; }
+  .modal-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    margin: 10px -16px 0;
+    padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+  .modal-actions button { flex: 1 1 auto; min-height: 46px; }
+  .count table { font-size: 13px; }
+  .count th, .count td { padding: 5px 4px; }
+  .count-inputs { gap: 8px; }
+  .summary { grid-template-columns: repeat(2, 1fr); }
+
+  .retry { bottom: calc(78px + env(safe-area-inset-bottom)); }
+  .foot { padding-bottom: 8px; }
+}

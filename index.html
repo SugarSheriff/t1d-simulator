@@ -2,7 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1216" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <title>Type 1: A Day</title>
     <meta name="description" content="A real-time type 1 diabetes simulator. Get through one day. It never stops." />
     <link rel="stylesheet" href="styles.css" />
@@ -10,6 +12,7 @@
   <body>
     <header class="topbar">
       <div class="brand">Type 1<span>: A Day</span></div>
+      <div class="mini" aria-hidden="true"><span id="mini-bg" class="cgm-value">---</span><span id="mini-arrow"></span></div>
       <div class="clock"><span id="day">Day 1</span><span id="time">6:45 AM</span></div>
       <div class="speed" role="group" aria-label="Simulation speed">
         <button data-speed="0" aria-label="Pause">❚❚</button>
@@ -51,10 +54,13 @@
         </div>
       </section>
 
-      <aside class="panel controls" aria-label="Actions">
+      <aside class="panel controls" id="controls" aria-label="Actions">
+        <section class="sec" data-sec="eat">
         <h2>Eat</h2>
         <div id="menu" class="menu"></div>
+        </section>
 
+        <section class="sec" data-sec="pod">
         <h2>Omnipod 5</h2>
         <div class="pod">
           <div><span id="pod-mode" class="pod-mode ok">Automated</span> <span id="pod-delivery" class="pod-sub"></span></div>
@@ -72,14 +78,18 @@
           <button id="change-pod">Change pod</button>
         </div>
         <p class="hint">Meals get bolused when you eat them.</p>
+        </section>
 
+        <section class="sec" data-sec="check">
         <h2>Check</h2>
         <div class="row">
           <button id="fingerstick">Fingerstick</button>
           <button id="ketones">Ketone strip</button>
           <button id="sensor">New G7 sensor</button>
         </div>
+        </section>
 
+        <section class="sec" data-sec="do">
         <h2>Do</h2>
         <div class="row acts">
           <button data-act="sit">Couch</button>
@@ -91,6 +101,7 @@
           <button id="water">Drink water</button>
         </div>
         <p id="lock-note" class="lock-note"></p>
+        </section>
       </aside>
 
       <section class="panel feed" aria-label="Event log">
@@ -107,6 +118,13 @@
     </main>
 
     <footer class="foot">Simplified simulation for awareness. Not medical advice. Never use it for real dosing.</footer>
+
+    <nav class="tabbar" aria-label="Actions">
+      <button data-tab="eat"><span class="ico" aria-hidden="true">🍎</span>Eat</button>
+      <button data-tab="pod"><span class="ico" aria-hidden="true">💉</span>Pod</button>
+      <button data-tab="check"><span class="ico" aria-hidden="true">🩸</span>Check</button>
+      <button data-tab="do"><span class="ico" aria-hidden="true">🚶</span>Do</button>
+    </nav>
 
     <button id="retry" class="retry primary" hidden>Try again</button>
 

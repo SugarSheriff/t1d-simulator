@@ -805,6 +805,9 @@
       else status = "No sensor · put on a new one";
     }
     $("#cgm-status").textContent = status;
+    $("#mini-bg").textContent = val.textContent;
+    $("#mini-bg").className = val.className;
+    $("#mini-arrow").textContent = $("#cgm-arrow").textContent;
 
     const p = S.pod;
     const working = M.podWorking(p);
@@ -857,6 +860,9 @@
       if (a === "sit") b.textContent = S.location === "work" ? "Desk" : "Couch";
     });
     $("#lock-note").textContent = locked ? `${S.forced.reason}, can't change what you're doing right now.` : "";
+    $('[data-tab="pod"]').classList.toggle("alert", !working || p.reservoir < 10 || p.age >= M.POD_EXPIRES);
+    $('[data-tab="check"]').classList.toggle("alert", c.status !== "ok" && c.status !== "warmup");
+    $('[data-tab="eat"]').classList.toggle("alert", S.bg < 70 && c.value != null && c.value < 70);
 
     drawGraph();
   }
@@ -971,6 +977,11 @@
   }
 
   // ---------- controls ----------
+  function closeSheet() {
+    $("#controls").classList.remove("open");
+    document.querySelectorAll("[data-tab]").forEach((x) => x.classList.remove("on"));
+  }
+
   function buildControls() {
     const menu = $("#menu");
     for (const id of T1D.MENU) {
@@ -979,7 +990,10 @@
       const tag = f.fast ? "for lows" : f.error >= 0.2 ? "no label" : "label";
       b.innerHTML = `<span>${f.name}</span><small>${tag}</small>`;
       if (f.fast) b.classList.add("fast");
-      b.onclick = () => eat(id);
+      b.onclick = () => {
+        closeSheet();
+        eat(id);
+      };
       menu.appendChild(b);
     }
 
@@ -1003,6 +1017,20 @@
       render();
     };
     $("#change-pod").onclick = changePod;
+    // Phones: each tab opens its section in a bottom sheet. Tap it again (or the screen above) to close.
+    const sheet = $("#controls");
+    const tabs = document.querySelectorAll("[data-tab]");
+    tabs.forEach((b) => {
+      b.onclick = () => {
+        const wasOpen = sheet.classList.contains("open") && b.classList.contains("on");
+        if (wasOpen) return closeSheet();
+        tabs.forEach((x) => x.classList.toggle("on", x === b));
+        sheet.querySelectorAll(".sec").forEach((sec) => sec.classList.toggle("active", sec.dataset.sec === b.dataset.tab));
+        sheet.classList.add("open");
+        sheet.scrollTop = 0;
+      };
+    });
+    document.querySelectorAll(".monitor, .feed, .stats, .topbar .mini").forEach((el) => el.addEventListener("click", closeSheet));
     $("#retry").onclick = () => start();
     $("#activity-mode").onclick = () => {
       S.stats.decisions++;
@@ -1039,6 +1067,7 @@
         if (S.forced) return;
         S.stats.decisions++;
         setActivity(b.dataset.act);
+        closeSheet();
         if (b.dataset.act === "sleep") log("You go to bed. Your G7 and pod are on watch.", "info");
         render();
       };
@@ -1056,6 +1085,10 @@
       }
     });
     window.addEventListener("resize", () => S && drawGraph());
+    // The top-bar reading only shows once the big number has scrolled away.
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(([e]) => $(".mini").classList.toggle("show", e.intersectionRatio < 1), { rootMargin: `-${$(".topbar").offsetHeight}px 0px 0px 0px`, threshold: [0, 1] }).observe($(".reading-num"));
+    } else $(".mini").classList.add("show");
   }
 
   const api = {
